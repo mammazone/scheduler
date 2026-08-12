@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#000000">
+<title>교대근무 캘린더</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --bg:#000000; --line:#242424; --text:#f2f2f4; --sub:#7a7d87;
+    --sun:#ff5c72; --sat:#4d9bff; --today:#4d9bff; --memo:#3ddc84; --accent:#f2c14e;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  body{margin:0; background:var(--bg); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,"Pretendard","Apple SD Gothic Neo",sans-serif; min-height:100vh;}
+  header{padding:16px 16px 8px; display:flex; align-items:center; justify-content:space-between;}
+  header .ym{font-size:24px; font-weight:800; letter-spacing:-0.5px;}
+  header .navbtns{display:flex; gap:6px;}
+  header button{background:#151515; border:1px solid var(--line); color:var(--text); width:34px; height:34px; border-radius:9px; font-size:15px;}
+  .grpbar{padding:0 16px 10px; font-size:11px; color:var(--sub); display:flex; justify-content:space-between; align-items:center;}
+  .toggle{display:flex; background:#151515; border:1px solid var(--line); border-radius:10px; padding:3px; margin:0 16px 12px;}
+  .toggle button{flex:1; padding:9px 0; border:none; background:transparent; color:var(--sub); font-size:13px; font-weight:700; border-radius:7px;}
+  .toggle button.on{background:var(--accent); color:#1b1206;}
+
+  .wdrow{display:grid; grid-template-columns:56px repeat(7,1fr); border-top:1px solid var(--line); border-bottom:1px solid var(--line);}
+  .wdrow div{text-align:center; font-size:11px; padding:8px 0; color:var(--sub); font-weight:600;}
+  .wdrow div.sun{color:var(--sun);} .wdrow div.sat{color:var(--sat);}
+
+  /* mine view */
+  .grid{display:grid; grid-template-columns:repeat(7,1fr);}
+  .cell{min-height:82px; border-right:1px solid var(--line); border-bottom:1px solid var(--line); padding:5px 4px 4px; position:relative; display:flex; flex-direction:column; gap:3px;}
+  .cell.blank{background:#050505;}
+  .cell.today{border:1.5px solid var(--today); background:rgba(77,155,255,.08);}
+  .cell .num{font-size:12px; font-weight:600;}
+  .cell .num.sun{color:var(--sun);} .cell .num.sat{color:var(--sat);}
+
+  /* shared view */
+  .weekblock{border-bottom:1px solid var(--line);}
+  .daterow{display:grid; grid-template-columns:56px repeat(7,1fr);}
+  .daterow .dnum{text-align:center; font-size:12px; font-weight:600; padding:6px 0; color:var(--sub);}
+  .daterow .dnum.sun{color:var(--sun);} .daterow .dnum.sat{color:var(--sat);} .daterow .dnum.today{color:var(--today);}
+  .memberrow{display:grid; grid-template-columns:56px repeat(7,1fr); border-top:1px solid var(--line);}
+  .memberrow .plabel{font-size:11px; color:var(--sub); display:flex; align-items:center; justify-content:center; text-align:center; background:#0a0a0a; padding:2px;}
+  .pcell{min-height:66px; border-left:1px solid var(--line); padding:4px; display:flex; flex-direction:column; gap:2px;}
+  .memberrow:nth-child(odd) .pcell{background:rgba(255,255,255,.02);}
+
+  .badge{align-self:flex-start; font-size:11px; font-weight:800; padding:3px 8px; border-radius:999px; color:#0a0b0f; line-height:1.2;}
+  .offtext{font-size:11px; font-weight:700; align-self:flex-start;}
+  .memo{font-size:9.5px; color:var(--memo); line-height:1.3; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;}
+  .synctag{font-size:11px; color:var(--sub); text-align:center; padding:14px 0 30px;}
+
+  .sheet-bg{position:fixed; inset:0; background:rgba(0,0,0,.6); display:none; align-items:flex-end; justify-content:center; z-index:50;}
+  .sheet-bg.show{display:flex;}
+  .sheet{background:#111214; width:100%; max-width:480px; border-radius:20px 20px 0 0; padding:20px 18px 26px; max-height:85vh; overflow-y:auto;}
+  .sheet h2{margin:0 0 14px; font-size:16px;}
+  .chiprow{display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px;}
+  .chip{padding:9px 14px; border-radius:999px; border:1.5px solid var(--line); background:#1a1b1e; color:var(--text); font-size:13px; font-weight:600; display:flex; align-items:center; gap:6px;}
+  .chip .cdot{width:9px; height:9px; border-radius:50%;}
+  .chip.sel{border-color:var(--accent); background:#2a2410;}
+  .chip.addnew{color:var(--sub); border-style:dashed;}
+  .addform{background:#191a1d; border-radius:14px; padding:14px; margin-bottom:14px; display:none;}
+  .addform.show{display:block;}
+  .addform input[type=text]{width:100%; background:#232428; border:1px solid var(--line); border-radius:10px; padding:11px; color:var(--text); font-size:14px; margin-bottom:10px;}
+  .swrow{display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;}
+  .sw{width:28px; height:28px; border-radius:50%; border:2px solid transparent;}
+  .sw.sel{border-color:#fff;}
+  .offchk{display:flex; align-items:center; gap:7px; font-size:12.5px; color:var(--sub); margin-bottom:10px;}
+  .addform .save2{width:100%; padding:10px; border-radius:10px; border:none; background:var(--accent); color:#1b1206; font-weight:700; font-size:13px;}
+  textarea{width:100%; min-height:76px; background:#1a1b1e; border:1px solid var(--line); border-radius:12px; color:var(--text); padding:12px; font-size:14px; resize:none; font-family:inherit;}
+  .row{display:flex; gap:8px; margin-top:16px;}
+  .row button{flex:1; padding:14px 0; border-radius:12px; border:none; font-size:14px; font-weight:700;}
+  .save{background:var(--accent); color:#1b1206;}
+  .cancel{background:#1a1b1e; color:var(--sub);}
+
+  .gate{min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px;}
+  .gatecard{background:#111214; border-radius:20px; padding:28px 24px; width:100%; max-width:380px;}
+  .gatecard h1{font-size:18px; margin:0 0 6px;}
+  .gatecard p{font-size:13px; color:var(--sub); margin:0 0 20px; line-height:1.5;}
+  .gatecard input{width:100%; background:#1a1b1e; border:1px solid var(--line); border-radius:12px; padding:14px; color:var(--text); font-size:15px; margin-bottom:10px;}
+  .gatecard button{width:100%; padding:14px; border-radius:12px; border:none; background:var(--accent); color:#1b1206; font-weight:700; font-size:15px;}
+</style>
+</head>
+<body>
+
+<div id="gate" class="gate">
+  <div class="gatecard">
+    <h1>교대근무 캘린더</h1>
+    <p>둘이 같은 그룹코드를 입력하면 캘린더가 공유돼요. 처음이면 원하는 코드를 새로 만들고, 상대방에게 그대로 알려주세요.</p>
+    <input id="nameInput" placeholder="내 이름 (예: 강호)">
+    <input id="codeInput" placeholder="그룹코드 (예: kangho2026)">
+    <button id="enterBtn">시작하기</button>
+  </div>
+</div>
+
+<div id="app" style="display:none;">
+  <header>
+    <div class="ym" id="ymLabel"></div>
+    <div class="navbtns"><button id="prevM">‹</button><button id="nextM">›</button></div>
+  </header>
+  <div class="grpbar"><span id="grpLabel"></span><span>실시간 동기화 중</span></div>
+  <div class="toggle">
+    <button id="tabMine" class="on">내 캘린더</button>
+    <button id="tabShared">같이보기</button>
+  </div>
+
+  <div id="mineView">
+    <div class="wdrow" id="wdRowMine" style="grid-template-columns:repeat(7,1fr);"></div>
+    <div class="grid" id="calGrid"></div>
+  </div>
+
+  <div id="sharedView" style="display:none;">
+    <div class="wdrow" id="wdRowShared"></div>
+    <div id="weeksWrap"></div>
+  </div>
+
+  <div class="synctag">날짜를 탭하면 근무/메모를 수정할 수 있어요</div>
+</div>
+
+<div class="sheet-bg" id="sheetBg">
+  <div class="sheet">
+    <h2 id="sheetDate"></h2>
+    <div class="chiprow" id="chipRow"></div>
+    <div class="addform" id="addForm">
+      <input type="text" id="newLabel" placeholder="근무형태 이름 (예: 교육, 주간대근)">
+      <div class="swrow" id="swRow"></div>
+      <label class="offchk"><input type="checkbox" id="offChk"> 휴무처럼 배지 없이 글자로만 표시</label>
+      <button class="save2" id="saveTypeBtn">근무형태 추가</button>
+    </div>
+    <textarea id="memoInput" placeholder="메모 (예: 병원 예약, 대근 등)"></textarea>
+    <div class="row">
+      <button class="cancel" id="cancelBtn">닫기</button>
+      <button class="save" id="saveBtn">저장</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = "https://ulfnycmnvjveqnafihny.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_0Y_lD9U9PPU--0n4Mjgv_w_Sa0qGqxq";
+
+let sb;
+try{
+  if(!SUPABASE_URL || SUPABASE_URL.includes('YOUR_') || !SUPABASE_ANON_KEY || SUPABASE_ANON_KEY.includes('YOUR_')){
+    throw new Error('SUPABASE_URL 또는 SUPABASE_ANON_KEY가 채워지지 않았습니다.');
+  }
+  sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+}catch(e){
+  document.body.innerHTML = '<div style="padding:40px 24px;color:#fff;font-family:sans-serif;line-height:1.6;"><h2>설정 오류</h2><p>' + e.message + '</p></div>';
+  throw e;
+}
+
+const ANCHOR = new Date(2026, 7, 1);
+const PATTERN = ['야간','야간','휴무','휴무','주간','주간','휴무','휴무'];
+const PALETTE = ['#4d7cff','#f2c14e','#ff5c8a','#3ddc84','#b083f0','#ff9f4d','#43c9c9','#9aa0ae'];
+
+let groupCode = localStorage.getItem('sc_group') || '';
+let myName = localStorage.getItem('sc_name') || '';
+let cur = new Date(); cur.setDate(1);
+let overrides = {}, memos = {}, shiftTypes = [], members = [];
+let selectedDate = null, selectedType = null, selectedColor = PALETTE[0], selectedPerson = null;
+let viewMode = 'mine';
+
+function fmt(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function patternOwnerName(){ const p = members.find(m=>m.has_pattern); return p ? p.name : null; }
+function computePattern(d){
+  const diff = Math.floor((new Date(d.getFullYear(),d.getMonth(),d.getDate()) - ANCHOR)/86400000);
+  return PATTERN[((diff % 8) + 8) % 8];
+}
+function baseTypeFor(person, d){
+  return (person === patternOwnerName()) ? computePattern(d) : '휴무';
+}
+function typeOf(person, dateStr, d){
+  const k = person+'|'+dateStr;
+  return overrides[k] ? overrides[k].shift_type : baseTypeFor(person, d);
+}
+function memoOf(person, dateStr){ return memos[person+'|'+dateStr]; }
+function typeMeta(label){ return shiftTypes.find(t=>t.label===label) || {label, color:'#888', is_off:false}; }
+
+async function ensureDefaultTypes(){
+  const {data} = await sb.from('shift_types').select('*').eq('group_code', groupCode);
+  if(!data || data.length===0){
+    await sb.from('shift_types').insert([
+      {group_code:groupCode, label:'야간', color:'#4d7cff', is_off:false, sort_order:0},
+      {group_code:groupCode, label:'주간', color:'#f2c14e', is_off:false, sort_order:1},
+      {group_code:groupCode, label:'휴무', color:'#ff5c72', is_off:true, sort_order:2},
+    ]);
+  }
+}
+async function ensureMember(){
+  const {data} = await sb.from('group_members').select('*').eq('group_code', groupCode);
+  if(!data || data.length===0){
+    await sb.from('group_members').insert({group_code:groupCode, name:myName, has_pattern:true});
+  } else if(!data.find(m=>m.name===myName)){
+    await sb.from('group_members').insert({group_code:groupCode, name:myName, has_pattern:false});
+  }
+}
+async function loadMembers(){
+  const {data} = await sb.from('group_members').select('*').eq('group_code', groupCode).order('joined_at');
+  members = data || [];
+}
+async function loadShiftTypes(){
+  const {data} = await sb.from('shift_types').select('*').eq('group_code', groupCode).order('sort_order');
+  shiftTypes = data || [];
+}
+async function loadMonthData(){
+  const y = cur.getFullYear(), m = cur.getMonth();
+  const start = fmt(new Date(y, m, 1));
+  const end = fmt(new Date(y, m+2, 0));
+  const [{data:ov}, {data:mm}] = await Promise.all([
+    sb.from('shift_overrides').select('*').eq('group_code', groupCode).gte('shift_date', start).lte('shift_date', end),
+    sb.from('memos').select('*').eq('group_code', groupCode).gte('memo_date', start).lte('memo_date', end)
+  ]);
+  overrides = {}; (ov||[]).forEach(r => overrides[r.person+'|'+r.shift_date] = r);
+  memos = {}; (mm||[]).forEach(r => memos[r.person+'|'+r.memo_date] = r);
+  await Promise.all([loadShiftTypes(), loadMembers()]);
+  renderAll();
+}
+
+function weekdayHeaderHTML(withLabelCol){
+  const days = ['일','월','화','수','목','금','토'];
+  let h = withLabelCol ? '<div></div>' : '';
+  days.forEach((w,i)=>{ h += `<div class="${i===0?'sun':i===6?'sat':''}">${w}</div>`; });
+  return h;
+}
+
+function renderAll(){
+  document.getElementById('ymLabel').textContent = `${cur.getFullYear()}.${String(cur.getMonth()+1).padStart(2,'0')}`;
+  document.getElementById('grpLabel').textContent = groupCode;
+  document.getElementById('wdRowMine').innerHTML = weekdayHeaderHTML(false);
+  document.getElementById('wdRowShared').innerHTML = weekdayHeaderHTML(true);
+  renderMine();
+  renderShared();
+}
+
+function cellInnerHTML(person, ds, d){
+  const label = typeOf(person, ds, d);
+  const meta = typeMeta(label);
+  let inner = meta.is_off
+    ? `<div class="offtext" style="color:${meta.color}">${label}</div>`
+    : `<div class="badge" style="background:${meta.color}">${label}</div>`;
+  const mm = memoOf(person, ds);
+  if(mm) inner += `<div class="memo">${mm.content.replace(/</g,'&lt;')}</div>`;
+  return inner;
+}
+
+function renderMine(){
+  const grid = document.getElementById('calGrid'); grid.innerHTML = '';
+  const y = cur.getFullYear(), m = cur.getMonth();
+  const firstDow = new Date(y,m,1).getDay();
+  const daysInMonth = new Date(y,m+1,0).getDate();
+  const todayStr = fmt(new Date());
+  for(let i=0;i<firstDow;i++){ const b=document.createElement('div'); b.className='cell blank'; grid.appendChild(b); }
+  for(let day=1; day<=daysInMonth; day++){
+    const d = new Date(y,m,day); const ds = fmt(d); const dow = d.getDay();
+    const cell = document.createElement('div');
+    cell.className = 'cell' + (ds===todayStr?' today':'');
+    let numCls = dow===0?'sun':dow===6?'sat':'';
+    cell.innerHTML = `<div class="num ${numCls}">${day}</div>` + cellInnerHTML(myName, ds, d);
+    cell.onclick = () => openSheet(ds, d, myName);
+    grid.appendChild(cell);
+  }
+}
+
+function renderShared(){
+  const wrap = document.getElementById('weeksWrap'); wrap.innerHTML = '';
+  const y = cur.getFullYear(), m = cur.getMonth();
+  const firstDow = new Date(y,m,1).getDay();
+  const daysInMonth = new Date(y,m+1,0).getDate();
+  const todayStr = fmt(new Date());
+
+  const cells = [];
+  for(let i=0;i<firstDow;i++) cells.push(null);
+  for(let day=1; day<=daysInMonth; day++) cells.push(new Date(y,m,day));
+  while(cells.length % 7 !== 0) cells.push(null);
+
+  for(let w=0; w<cells.length; w+=7){
+    const week = cells.slice(w, w+7);
+    const block = document.createElement('div'); block.className = 'weekblock';
+
+    const drow = document.createElement('div'); drow.className = 'daterow';
+    drow.innerHTML = '<div></div>';
+    week.forEach(d=>{
+      if(!d){ drow.innerHTML += '<div></div>'; return; }
+      const ds = fmt(d); const dow = d.getDay();
+      let cls = dow===0?'sun':dow===6?'sat':'';
+      if(ds===todayStr) cls += ' today';
+      drow.innerHTML += `<div class="dnum ${cls}">${d.getDate()}</div>`;
+    });
+    block.appendChild(drow);
+
+    members.forEach(mem=>{
+      const mrow = document.createElement('div'); mrow.className = 'memberrow';
+      const label = document.createElement('div'); label.className='plabel'; label.textContent = mem.name;
+      mrow.appendChild(label);
+      week.forEach(d=>{
+        const pc = document.createElement('div'); pc.className='pcell';
+        if(d){
+          const ds = fmt(d);
+          pc.innerHTML = cellInnerHTML(mem.name, ds, d);
+          pc.onclick = () => openSheet(ds, d, mem.name);
+        }
+        mrow.appendChild(pc);
+      });
+      block.appendChild(mrow);
+    });
+    wrap.appendChild(block);
+  }
+}
+
+function renderChips(){
+  const row = document.getElementById('chipRow'); row.innerHTML = '';
+  shiftTypes.forEach(t=>{
+    const c = document.createElement('div');
+    c.className = 'chip' + (t.label===selectedType?' sel':'');
+    c.innerHTML = `<span class="cdot" style="background:${t.color}"></span>${t.label}`;
+    c.onclick = () => { selectedType = t.label; renderChips(); };
+    row.appendChild(c);
+  });
+  const add = document.createElement('div'); add.className = 'chip addnew'; add.textContent = '+ 근무형태 추가';
+  add.onclick = () => document.getElementById('addForm').classList.toggle('show');
+  row.appendChild(add);
+}
+function renderSwatches(){
+  const row = document.getElementById('swRow'); row.innerHTML = '';
+  PALETTE.forEach(c=>{
+    const el = document.createElement('div'); el.className = 'sw' + (c===selectedColor?' sel':'');
+    el.style.background = c; el.onclick = () => { selectedColor = c; renderSwatches(); };
+    row.appendChild(el);
+  });
+}
+
+async function openSheet(ds, d, person){
+  selectedDate = ds; selectedPerson = person; selectedColor = PALETTE[0];
+  selectedType = typeOf(person, ds, d);
+  document.getElementById('sheetDate').textContent = `${person} · ${d.getMonth()+1}월 ${d.getDate()}일`;
+  const mm = memoOf(person, ds);
+  document.getElementById('memoInput').value = mm ? mm.content : '';
+  document.getElementById('addForm').classList.remove('show');
+  document.getElementById('newLabel').value = '';
+  document.getElementById('offChk').checked = false;
+  renderChips(); renderSwatches();
+  document.getElementById('sheetBg').classList.add('show');
+}
+
+document.getElementById('cancelBtn').onclick = () => document.getElementById('sheetBg').classList.remove('show');
+
+document.getElementById('saveTypeBtn').onclick = async () => {
+  const label = document.getElementById('newLabel').value.trim();
+  if(!label){ alert('근무형태 이름을 입력해주세요'); return; }
+  const isOff = document.getElementById('offChk').checked;
+  const {error} = await sb.from('shift_types').insert({group_code: groupCode, label, color: selectedColor, is_off: isOff, sort_order: shiftTypes.length});
+  if(error){ alert(error.message.includes('duplicate') ? '이미 있는 근무형태 이름이에요' : ('추가 실패: '+error.message)); return; }
+  await loadShiftTypes(); selectedType = label;
+  document.getElementById('addForm').classList.remove('show');
+  renderChips();
+};
+
+document.getElementById('saveBtn').onclick = async () => {
+  const memoVal = document.getElementById('memoInput').value.trim();
+  const d = new Date(selectedDate);
+  const natural = baseTypeFor(selectedPerson, d);
+  if(selectedType === natural){
+    await sb.from('shift_overrides').delete().eq('group_code', groupCode).eq('person', selectedPerson).eq('shift_date', selectedDate);
+  } else {
+    await sb.from('shift_overrides').upsert({group_code: groupCode, person: selectedPerson, shift_date: selectedDate, shift_type: selectedType, edited_by: myName}, {onConflict:'group_code,person,shift_date'});
+  }
+  if(memoVal){
+    await sb.from('memos').upsert({group_code: groupCode, person: selectedPerson, memo_date: selectedDate, content: memoVal, author: myName}, {onConflict:'group_code,person,memo_date'});
+  } else {
+    await sb.from('memos').delete().eq('group_code', groupCode).eq('person', selectedPerson).eq('memo_date', selectedDate);
+  }
+  document.getElementById('sheetBg').classList.remove('show');
+  loadMonthData();
+};
+
+document.getElementById('prevM').onclick = () => { cur.setMonth(cur.getMonth()-1); loadMonthData(); };
+document.getElementById('nextM').onclick = () => { cur.setMonth(cur.getMonth()+1); loadMonthData(); };
+
+document.getElementById('tabMine').onclick = () => {
+  viewMode='mine';
+  document.getElementById('tabMine').classList.add('on');
+  document.getElementById('tabShared').classList.remove('on');
+  document.getElementById('mineView').style.display='block';
+  document.getElementById('sharedView').style.display='none';
+};
+document.getElementById('tabShared').onclick = () => {
+  viewMode='shared';
+  document.getElementById('tabShared').classList.add('on');
+  document.getElementById('tabMine').classList.remove('on');
+  document.getElementById('sharedView').style.display='block';
+  document.getElementById('mineView').style.display='none';
+};
+
+document.getElementById('enterBtn').onclick = async () => {
+  const n = document.getElementById('nameInput').value.trim();
+  const c = document.getElementById('codeInput').value.trim();
+  if(!n || !c){ alert('이름과 그룹코드를 둘 다 입력해주세요'); return; }
+  myName = n; groupCode = c;
+  const btn = document.getElementById('enterBtn'); btn.textContent = '연결 중...'; btn.disabled = true;
+  const {error} = await sb.from('shift_overrides').select('id').limit(1);
+  if(error){ alert('DB 연결에 실패했습니다: ' + error.message); btn.textContent = '시작하기'; btn.disabled = false; return; }
+  localStorage.setItem('sc_name', n); localStorage.setItem('sc_group', c);
+  boot();
+};
+
+function subscribeRealtime(){
+  sb.channel('sc_'+groupCode)
+    .on('postgres_changes', {event:'*', schema:'public', table:'shift_overrides', filter:`group_code=eq.${groupCode}`}, loadMonthData)
+    .on('postgres_changes', {event:'*', schema:'public', table:'memos', filter:`group_code=eq.${groupCode}`}, loadMonthData)
+    .on('postgres_changes', {event:'*', schema:'public', table:'shift_types', filter:`group_code=eq.${groupCode}`}, loadMonthData)
+    .on('postgres_changes', {event:'*', schema:'public', table:'group_members', filter:`group_code=eq.${groupCode}`}, loadMonthData)
+    .subscribe();
+}
+
+async function boot(){
+  document.getElementById('gate').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  await ensureDefaultTypes();
+  await ensureMember();
+  await loadMonthData();
+  subscribeRealtime();
+}
+
+if(groupCode && myName){ boot(); }
+</script>
+</body>
+</html>
