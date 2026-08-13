@@ -124,6 +124,7 @@
     <div class="ym" id="ymLabel"></div>
     <div class="navbtns">
       <button class="addEventBtn" id="addEventBtn">+ 일정</button>
+      <button id="settingsBtn">⚙</button>
       <button id="prevM">‹</button>
       <button id="nextM">›</button>
     </div>
@@ -163,6 +164,17 @@
       <button class="cancel" id="cancelBtn">닫기</button>
       <button class="save" id="saveBtn">저장</button>
     </div>
+  </div>
+</div>
+
+<div class="sheet-bg" id="settingsSheetBg">
+  <div class="sheet">
+    <h2>설정</h2>
+    <div style="font-size:12px; color:var(--sub); margin-bottom:14px;">현재 <b id="stMe" style="color:var(--text)"></b>로 그룹 <b id="stGrp" style="color:var(--text)"></b>에 접속 중이에요.</div>
+    <div style="font-size:12.5px; color:var(--sub); margin-bottom:8px;">8일 근무 패턴 자동계산 적용 대상</div>
+    <div id="patternPicker" style="margin-bottom:18px;"></div>
+    <button class="save2" id="logoutBtn" style="background:#ff5c72; color:#1b0606;">다른 이름/그룹코드로 로그아웃</button>
+    <div class="row"><button class="cancel" id="settingsCancelBtn">닫기</button></div>
   </div>
 </div>
 
@@ -478,8 +490,24 @@ document.getElementById('saveBtn').onclick = async () => {
   loadMonthData();
 };
 
-document.getElementById('prevM').onclick = () => { cur.setMonth(cur.getMonth()-1); loadMonthData(); };
-document.getElementById('nextM').onclick = () => { cur.setMonth(cur.getMonth()+1); loadMonthData(); };
+async function goMonth(delta){
+  const el = document.getElementById('swipeArea');
+  el.style.transition = 'transform .18s ease, opacity .18s ease';
+  el.style.transform = `translateX(${delta>0?-26:26}px)`;
+  el.style.opacity = '0.2';
+  await new Promise(r=>setTimeout(r,180));
+  cur.setMonth(cur.getMonth()+delta);
+  await loadMonthData();
+  el.style.transition = 'none';
+  el.style.transform = `translateX(${delta>0?26:-26}px)`;
+  requestAnimationFrame(()=>{
+    el.style.transition = 'transform .2s ease, opacity .2s ease';
+    el.style.transform = 'translateX(0)';
+    el.style.opacity = '1';
+  });
+}
+document.getElementById('prevM').onclick = () => goMonth(-1);
+document.getElementById('nextM').onclick = () => goMonth(1);
 
 document.getElementById('tabMine').onclick = () => {
   viewMode='mine';
@@ -540,6 +568,40 @@ document.getElementById('evSaveBtn').onclick = async () => {
   renderEventList();
 };
 
+// ===== 설정: 패턴 대상 선택 / 로그아웃 =====
+function renderPatternPicker(){
+  const wrap = document.getElementById('patternPicker'); wrap.innerHTML = '';
+  members.forEach(mem=>{
+    const row = document.createElement('label');
+    row.style.cssText = 'display:flex; align-items:center; gap:8px; padding:10px 0; font-size:13.5px;';
+    const radio = document.createElement('input');
+    radio.type = 'radio'; radio.name = 'patternOwner'; radio.checked = !!mem.has_pattern;
+    radio.onclick = async () => {
+      await sb.from('group_members').update({has_pattern:false}).eq('group_code', groupCode);
+      await sb.from('group_members').update({has_pattern:true}).eq('group_code', groupCode).eq('name', mem.name);
+      await loadMonthData();
+      renderPatternPicker();
+    };
+    row.appendChild(radio);
+    const span = document.createElement('span'); span.textContent = mem.name;
+    row.appendChild(span);
+    wrap.appendChild(row);
+  });
+}
+document.getElementById('settingsBtn').onclick = () => {
+  document.getElementById('stMe').textContent = myName;
+  document.getElementById('stGrp').textContent = groupCode;
+  renderPatternPicker();
+  document.getElementById('settingsSheetBg').classList.add('show');
+};
+document.getElementById('settingsCancelBtn').onclick = () => document.getElementById('settingsSheetBg').classList.remove('show');
+document.getElementById('settingsSheetBg').addEventListener('click', (e)=>{ if(e.target.id==='settingsSheetBg') document.getElementById('settingsSheetBg').classList.remove('show'); });
+document.getElementById('logoutBtn').onclick = () => {
+  if(!confirm('로그아웃하고 다른 이름/그룹코드로 다시 시작할까요?')) return;
+  localStorage.removeItem('sc_name'); localStorage.removeItem('sc_group');
+  location.reload();
+};
+
 document.getElementById('enterBtn').onclick = async () => {
   const n = document.getElementById('nameInput').value.trim();
   const c = document.getElementById('codeInput').value.trim();
@@ -562,8 +624,7 @@ document.getElementById('enterBtn').onclick = async () => {
     const dx = e.changedTouches[0].clientX - sx;
     const dy = e.changedTouches[0].clientY - sy;
     if(Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy)*1.5){
-      if(dx < 0){ cur.setMonth(cur.getMonth()+1); } else { cur.setMonth(cur.getMonth()-1); }
-      loadMonthData();
+      goMonth(dx < 0 ? 1 : -1);
     }
   }, {passive:true});
 })();
