@@ -16,17 +16,17 @@
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
   body{margin:0; background:var(--bg); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,"Pretendard","Apple SD Gothic Neo",sans-serif; min-height:100vh; overscroll-behavior-x:none;}
-  header{padding:16px 16px 8px; display:flex; align-items:center; justify-content:space-between;}
+  header{padding:16px 16px 8px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;}
   header .ym{font-size:24px; font-weight:800; letter-spacing:-0.5px;}
-  header .navbtns{display:flex; gap:6px;}
-  header button{background:#151515; border:1px solid var(--line); color:var(--text); width:34px; height:34px; border-radius:9px; font-size:15px;}
-  .addEventBtn{background:#151515; border:1px solid var(--line); color:var(--accent); border-radius:9px; padding:0 12px; height:34px; font-size:12.5px; font-weight:700;}
+  header .navbtns{display:flex; gap:6px; flex-wrap:nowrap;}
+  header button{background:#151515; border:1px solid var(--line); color:var(--text); width:34px; height:34px; border-radius:9px; font-size:15px; flex-shrink:0;}
+  .addEventBtn{background:#151515; border:1px solid var(--line); color:var(--accent); border-radius:9px; padding:0 12px; height:34px; font-size:12.5px; font-weight:700; white-space:nowrap; flex-shrink:0; width:auto;}
   .grpbar{padding:0 16px 10px; font-size:11px; color:var(--sub); display:flex; justify-content:space-between; align-items:center;}
   .toggle{display:flex; background:#151515; border:1px solid var(--line); border-radius:10px; padding:3px; margin:0 16px 12px; gap:6px;}
   .toggle button{flex:1; padding:9px 0; border:none; background:transparent; color:var(--sub); font-size:13px; font-weight:700; border-radius:7px;}
   .toggle button.on{background:var(--accent); color:#1b1206;}
 
-  .wdrow{display:grid; grid-template-columns:48px repeat(7,1fr); border-top:1px solid var(--line); border-bottom:1px solid var(--line);}
+  .wdrow{display:grid; grid-template-columns:48px repeat(7,1fr); border-top:1px solid var(--line); border-bottom:1px solid var(--line); position:sticky; top:0; background:var(--bg); z-index:5;}
   .wdrow div{text-align:center; font-size:11px; padding:7px 0; color:var(--sub); font-weight:600;}
   .wdrow div.sun{color:var(--sun);} .wdrow div.sat{color:var(--sat);}
 
@@ -36,27 +36,30 @@
   .grid{display:grid; grid-template-columns:repeat(7,1fr);}
   .cell{min-height:78px; border-right:1px solid var(--line); border-bottom:1px solid var(--line); padding:4px 3px 4px; position:relative; display:flex; flex-direction:column; gap:2px;}
   .cell.blank{background:#050505;}
-  .cell.today{border:1.5px solid var(--today); background:rgba(77,155,255,.08);}
+  .cell.today{border:2px solid var(--today); background:rgba(77,155,255,.1);}
   .cell .num{font-size:11.5px; font-weight:600;}
-  .cell .num.sun{color:var(--sun);} .cell .num.sat{color:var(--sat);}
+  .cell .num.sun{color:var(--sun);} .cell .num.sat{color:var(--sat);} .cell .num.hol{color:var(--sun);}
+  .cell .num.today{font-weight:900;}
+  .holname{font-size:8px; color:var(--sun); font-weight:700; margin-top:-1px;}
 
   /* shared view - 좀 더 컴팩트하게 */
   .weekblock{border-bottom:1px solid var(--line);}
   .daterow{display:grid; grid-template-columns:48px repeat(7,1fr);}
   .daterow .dnum{text-align:center; font-size:11px; font-weight:600; padding:5px 0; color:var(--sub);}
-  .daterow .dnum.sun{color:var(--sun);} .daterow .dnum.sat{color:var(--sat);} .daterow .dnum.today{color:var(--today);}
+  .daterow .dnum.sun{color:var(--sun);} .daterow .dnum.sat{color:var(--sat);} .daterow .dnum.hol{color:var(--sun);}
+  .daterow .dnum.today{color:#fff; background:var(--today); border-radius:6px; font-weight:900;}
   .memberrow{display:grid; grid-template-columns:48px repeat(7,1fr); border-top:1px solid var(--line);}
   .memberrow .plabel{font-size:9.5px; color:var(--sub); display:flex; align-items:center; justify-content:center; text-align:center; background:#0a0a0a; padding:2px; line-height:1.2;}
   .pcell{min-height:46px; border-left:1px solid var(--line); padding:3px; display:flex; flex-direction:column; gap:1px;}
   .memberrow:nth-child(odd) .pcell{background:rgba(255,255,255,.02);}
 
-  .badge{align-self:flex-start; font-size:10px; font-weight:800; padding:2px 6px; border-radius:999px; color:#0a0b0f; line-height:1.25;}
-  .offtext{font-size:10px; font-weight:700; align-self:flex-start;}
-  .bar{font-size:8.5px; font-weight:700; color:#08150e; padding:1px 4px; margin:1px 0; line-height:1.4; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;}
+  .badge{align-self:flex-start; font-size:10px; font-weight:800; padding:2px 6px; border-radius:999px; color:#0a0b0f; line-height:1.25; flex-shrink:0;}
+  .offtext{font-size:10px; font-weight:700; align-self:flex-start; flex-shrink:0;}
+  .bar{font-size:8.5px; font-weight:700; color:#08150e; padding:0 4px; margin:1px 0; height:13px; line-height:13px; box-sizing:border-box; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; flex-shrink:0;}
   .bar.rl{border-radius:6px 0 0 6px; margin-left:-3px; padding-left:5px;}
   .bar.rr{border-radius:0 6px 6px 0; margin-right:-3px;}
   .bar.rl.rr{border-radius:6px; margin:1px 0;}
-  .memoline{font-size:9px; color:var(--memo); line-height:1.35; word-break:break-all;}
+  .memoline{font-size:9px; color:var(--memo); line-height:1.35; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex-shrink:0;}
   .synctag{font-size:11px; color:var(--sub); text-align:center; padding:14px 0 30px;}
 
   .sheet-bg{position:fixed; inset:0; background:rgba(0,0,0,.6); display:none; align-items:flex-end; justify-content:center; z-index:50;}
@@ -72,7 +75,8 @@
   .msection:last-of-type{border-bottom:none; padding-bottom:0;}
   .msection .mname{font-size:13px; font-weight:700; color:var(--sub); margin-bottom:10px;}
   .memoItem{display:flex; align-items:center; gap:8px; background:#1a1b1e; border-radius:10px; padding:8px 10px; margin-bottom:6px; font-size:12.5px;}
-  .memoItem span{flex:1; color:var(--memo);}
+  .memoItem span{flex:1; color:var(--memo); cursor:pointer;}
+  .memoItem input{flex:1; background:#232428; border:1px solid var(--accent); border-radius:6px; color:var(--text); font-size:12.5px; padding:4px 6px;}
   .memoItem button{background:none; border:none; color:var(--sub); font-size:15px; padding:0 4px;}
   .memoAddRow{display:flex; gap:6px; margin-top:6px;}
   .memoAddRow input{flex:1; background:#1a1b1e; border:1px solid var(--line); border-radius:10px; padding:9px 11px; color:var(--text); font-size:13px;}
@@ -190,11 +194,11 @@
       </div>
       <label>색상</label>
       <div class="swrow" id="evSwRow"></div>
-      <button class="save2" id="evSaveBtn" style="margin-top:8px;">일정 추가</button>
       <div class="eventList" id="eventList"></div>
     </div>
     <div class="row">
       <button class="cancel" id="eventCancelBtn">닫기</button>
+      <button class="save" id="evSaveBtn">일정 추가</button>
     </div>
   </div>
 </div>
@@ -217,6 +221,14 @@ try{
 const ANCHOR = new Date(2026, 7, 1);
 const PATTERN = ['야간','야간','휴무','휴무','주간','주간','휴무','휴무'];
 const PALETTE = ['#4d7cff','#f2c14e','#ff5c8a','#3ddc84','#b083f0','#ff9f4d','#43c9c9','#9aa0ae'];
+
+const HOLIDAYS = {
+  '2026-01-01':'신정','2026-02-16':'설날연휴','2026-02-17':'설날','2026-02-18':'설날연휴',
+  '2026-03-01':'삼일절','2026-03-02':'대체공휴일','2026-05-01':'노동절','2026-05-05':'어린이날',
+  '2026-05-24':'부처님오신날','2026-05-25':'대체공휴일','2026-06-06':'현충일','2026-07-17':'제헌절',
+  '2026-08-15':'광복절','2026-08-17':'대체공휴일','2026-09-24':'추석연휴','2026-09-25':'추석','2026-09-26':'추석연휴',
+  '2026-10-03':'개천절','2026-10-05':'대체공휴일','2026-10-09':'한글날','2026-12-25':'크리스마스'
+};
 
 let groupCode = localStorage.getItem('sc_group') || '';
 let myName = localStorage.getItem('sc_name') || '';
@@ -332,8 +344,10 @@ function renderMine(){
     const d = new Date(y,m,day); const ds = fmt(d); const dow = d.getDay();
     const cell = document.createElement('div');
     cell.className = 'cell' + (ds===todayStr?' today':'');
-    let numCls = dow===0?'sun':dow===6?'sat':'';
-    cell.innerHTML = `<div class="num ${numCls}">${day}</div>` + cellInnerHTML(myName, ds, d);
+    const hol = HOLIDAYS[ds];
+    let numCls = hol ? 'hol' : (dow===0?'sun':dow===6?'sat':'');
+    if(ds===todayStr) numCls += ' today';
+    cell.innerHTML = `<div class="num ${numCls}">${day}</div>` + (hol?`<div class="holname">${hol}</div>`:'') + cellInnerHTML(myName, ds, d);
     cell.onclick = () => openSheet(ds, d);
     grid.appendChild(cell);
   }
@@ -360,7 +374,8 @@ function renderShared(){
     week.forEach(d=>{
       if(!d){ drow.innerHTML += '<div></div>'; return; }
       const ds = fmt(d); const dow = d.getDay();
-      let cls = dow===0?'sun':dow===6?'sat':'';
+      const hol = HOLIDAYS[ds];
+      let cls = hol ? 'hol' : (dow===0?'sun':dow===6?'sat':'');
       if(ds===todayStr) cls += ' today';
       drow.innerHTML += `<div class="dnum ${cls}">${d.getDate()}</div>`;
     });
@@ -418,6 +433,12 @@ async function deleteMemo(id){
   await loadMonthData();
   buildMembersSheet();
 }
+async function updateMemo(id, text){
+  if(!text.trim()) return;
+  await sb.from('memos').update({content:text.trim()}).eq('id', id);
+  await loadMonthData();
+  buildMembersSheet();
+}
 
 function buildMembersSheet(){
   const wrap = document.getElementById('membersSheet'); wrap.innerHTML = '';
@@ -430,7 +451,15 @@ function buildMembersSheet(){
     const memoWrap = document.createElement('div');
     memosOf(mem.name, selectedDate).forEach(mm=>{
       const item = document.createElement('div'); item.className='memoItem';
-      item.innerHTML = `<span>${mm.content.replace(/</g,'&lt;')}</span>`;
+      const span = document.createElement('span'); span.textContent = mm.content;
+      span.onclick = () => {
+        const input = document.createElement('input'); input.value = mm.content;
+        item.replaceChild(input, span); input.focus(); input.select();
+        const commit = () => updateMemo(mm.id, input.value);
+        input.onkeydown = (e) => { if(e.key==='Enter') commit(); };
+        input.onblur = commit;
+      };
+      item.appendChild(span);
       const delBtn = document.createElement('button'); delBtn.textContent='✕';
       delBtn.onclick = () => deleteMemo(mm.id);
       item.appendChild(delBtn);
@@ -490,20 +519,24 @@ document.getElementById('saveBtn').onclick = async () => {
   loadMonthData();
 };
 
+let monthMoving = false;
 async function goMonth(delta){
+  if(monthMoving) return;
+  monthMoving = true;
   const el = document.getElementById('swipeArea');
-  el.style.transition = 'transform .18s ease, opacity .18s ease';
+  cur.setMonth(cur.getMonth()+delta);
+  el.style.transition = 'transform .15s ease, opacity .15s ease';
   el.style.transform = `translateX(${delta>0?-26:26}px)`;
   el.style.opacity = '0.2';
-  await new Promise(r=>setTimeout(r,180));
-  cur.setMonth(cur.getMonth()+delta);
-  await loadMonthData();
+  // 데이터 로딩과 나가는 애니메이션을 동시에 진행해서 대기시간을 줄임
+  await Promise.all([ loadMonthData(), new Promise(r=>setTimeout(r,150)) ]);
   el.style.transition = 'none';
   el.style.transform = `translateX(${delta>0?26:-26}px)`;
   requestAnimationFrame(()=>{
-    el.style.transition = 'transform .2s ease, opacity .2s ease';
+    el.style.transition = 'transform .18s ease, opacity .18s ease';
     el.style.transform = 'translateX(0)';
     el.style.opacity = '1';
+    setTimeout(()=>{ monthMoving = false; }, 180);
   });
 }
 document.getElementById('prevM').onclick = () => goMonth(-1);
