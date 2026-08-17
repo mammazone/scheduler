@@ -26,7 +26,8 @@
   .toggle button{flex:1; padding:9px 0; border:none; background:transparent; color:var(--sub); font-size:13px; font-weight:700; border-radius:7px;}
   .toggle button.on{background:var(--accent); color:#1b1206;}
 
-  .wdrow{display:grid; grid-template-columns:48px repeat(7,1fr); border-top:1px solid var(--line); border-bottom:1px solid var(--line); position:-webkit-sticky; position:sticky; top:0; background:var(--bg); z-index:5;}
+  #topBar{position:-webkit-sticky; position:sticky; top:0; background:var(--bg); z-index:20;}
+  .wdrow{display:grid; grid-template-columns:48px repeat(7,1fr); border-top:1px solid var(--line); border-bottom:1px solid var(--line);}
   .wdrow div{text-align:center; font-size:11px; padding:7px 0; color:var(--sub); font-weight:600;}
   .wdrow div.sun{color:var(--sun);} .wdrow div.sat{color:var(--sat);}
 
@@ -124,29 +125,31 @@
 </div>
 
 <div id="app" style="display:none;">
-  <header>
-    <div class="ym" id="ymLabel"></div>
-    <div class="navbtns">
-      <button class="addEventBtn" id="addEventBtn">+ 일정</button>
-      <button id="settingsBtn">⚙</button>
-      <button id="prevM">‹</button>
-      <button id="nextM">›</button>
+  <div id="topBar">
+    <header>
+      <div class="ym" id="ymLabel"></div>
+      <div class="navbtns">
+        <button class="addEventBtn" id="addEventBtn">+ 일정</button>
+        <button id="settingsBtn">⚙</button>
+        <button id="prevM">‹</button>
+        <button id="nextM">›</button>
+      </div>
+    </header>
+    <div class="grpbar"><span id="grpLabel"></span><span>실시간 동기화 중</span></div>
+    <div class="toggle">
+      <button id="tabMine" class="on">내 캘린더</button>
+      <button id="tabShared">같이보기</button>
     </div>
-  </header>
-  <div class="grpbar"><span id="grpLabel"></span><span>실시간 동기화 중</span></div>
-  <div class="toggle">
-    <button id="tabMine" class="on">내 캘린더</button>
-    <button id="tabShared">같이보기</button>
+    <div id="wdWrapMine"><div class="wdrow" id="wdRowMine" style="grid-template-columns:repeat(7,1fr);"></div></div>
+    <div id="wdWrapShared" style="display:none;"><div class="wdrow" id="wdRowShared"></div></div>
   </div>
 
   <div id="swipeArea">
     <div id="mineView">
-      <div class="wdrow" id="wdRowMine" style="grid-template-columns:repeat(7,1fr);"></div>
       <div class="grid" id="calGrid"></div>
     </div>
 
     <div id="sharedView" style="display:none;">
-      <div class="wdrow" id="wdRowShared"></div>
       <div id="weeksWrap"></div>
     </div>
   </div>
@@ -578,6 +581,8 @@ document.getElementById('tabMine').onclick = () => {
   document.getElementById('tabShared').classList.remove('on');
   document.getElementById('mineView').style.display='block';
   document.getElementById('sharedView').style.display='none';
+  document.getElementById('wdWrapMine').style.display='block';
+  document.getElementById('wdWrapShared').style.display='none';
 };
 document.getElementById('tabShared').onclick = () => {
   viewMode='shared';
@@ -585,6 +590,8 @@ document.getElementById('tabShared').onclick = () => {
   document.getElementById('tabMine').classList.remove('on');
   document.getElementById('sharedView').style.display='block';
   document.getElementById('mineView').style.display='none';
+  document.getElementById('wdWrapShared').style.display='block';
+  document.getElementById('wdWrapMine').style.display='none';
 };
 
 // ===== 일정(막대) 기능 =====
