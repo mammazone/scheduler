@@ -26,7 +26,7 @@
   .toggle button{flex:1; padding:9px 0; border:none; background:transparent; color:var(--sub); font-size:13px; font-weight:700; border-radius:7px;}
   .toggle button.on{background:var(--accent); color:#1b1206;}
 
-  .wdrow{display:grid; grid-template-columns:48px repeat(7,1fr); border-top:1px solid var(--line); border-bottom:1px solid var(--line); position:sticky; top:0; background:var(--bg); z-index:5;}
+  .wdrow{display:grid; grid-template-columns:48px repeat(7,1fr); border-top:1px solid var(--line); border-bottom:1px solid var(--line); position:-webkit-sticky; position:sticky; top:0; background:var(--bg); z-index:5;}
   .wdrow div{text-align:center; font-size:11px; padding:7px 0; color:var(--sub); font-weight:600;}
   .wdrow div.sun{color:var(--sun);} .wdrow div.sat{color:var(--sat);}
 
@@ -541,27 +541,33 @@ document.getElementById('saveBtn').onclick = async () => {
 };
 
 let monthMoving = false;
+function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
 async function goMonth(delta){
   if(monthMoving) return;
   monthMoving = true;
   const el = document.getElementById('swipeArea');
   cur.setMonth(cur.getMonth()+delta);
-  el.style.transition = 'transform .15s ease, opacity .15s ease';
+  loadMonthData(); // await하지 않음: 캐시가 있으면 애니메이션 중에 바로 렌더되고, 없으면 끝난 뒤 조용히 반영됨
+
+  el.style.willChange = 'transform, opacity';
+  el.style.transition = 'transform .16s ease, opacity .16s ease';
   el.style.transform = `translateX(${delta>0?-26:26}px)`;
-  el.style.opacity = '0.2';
-  await Promise.all([ loadMonthData(), new Promise(r=>setTimeout(r,150)) ]);
+  el.style.opacity = '0.25';
+  await sleep(160);
   el.style.transition = 'none';
   el.style.transform = `translateX(${delta>0?26:-26}px)`;
   requestAnimationFrame(()=>{
-    el.style.transition = 'transform .18s ease, opacity .18s ease';
-    el.style.transform = 'translateX(0)';
-    el.style.opacity = '1';
-    setTimeout(()=>{
-      el.style.transition = 'none';
-      el.style.transform = '';   // sticky가 깨지지 않도록 transform 자체를 제거
-      monthMoving = false;
-    }, 190);
+    requestAnimationFrame(()=>{
+      el.style.transition = 'transform .16s ease, opacity .16s ease';
+      el.style.transform = 'translateX(0)';
+      el.style.opacity = '1';
+    });
   });
+  await sleep(170);
+  el.style.transition = 'none';
+  el.style.transform = '';
+  el.style.willChange = '';
+  monthMoving = false;
 }
 document.getElementById('prevM').onclick = () => goMonth(-1);
 document.getElementById('nextM').onclick = () => goMonth(1);
