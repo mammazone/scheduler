@@ -75,10 +75,16 @@
   .msection{margin-bottom:18px; padding-bottom:16px; border-bottom:1px solid var(--line);}
   .msection:last-of-type{border-bottom:none; padding-bottom:0;}
   .msection .mname{font-size:13px; font-weight:700; color:var(--sub); margin-bottom:10px;}
-  .memoItem{display:flex; align-items:center; gap:8px; background:#1a1b1e; border-radius:10px; padding:8px 10px; margin-bottom:6px; font-size:12.5px;}
+  .memoItem{display:flex; align-items:center; gap:6px; background:#1a1b1e; border-radius:10px; padding:8px 8px; margin-bottom:6px; font-size:12.5px;}
+  .memoItem .dragHandle{color:var(--sub); font-size:14px; padding:0 2px; cursor:grab; touch-action:none;}
   .memoItem span{flex:1; color:var(--memo); cursor:pointer;}
+  .memoItem span.done{color:var(--sub); text-decoration:line-through;}
   .memoItem input{flex:1; background:#232428; border:1px solid var(--accent); border-radius:6px; color:var(--text); font-size:12.5px; padding:4px 6px;}
   .memoItem button{background:none; border:none; color:var(--sub); font-size:15px; padding:0 4px;}
+  .memoItem .doneBtn{color:var(--memo); font-size:14px;}
+  .memoItem .doneBtn.on{color:var(--accent);}
+  .memoItem.dragging{opacity:.5; background:#26282e;}
+  .memoline.done{color:var(--sub); text-decoration:line-through;}
   .memoAddRow{display:flex; gap:6px; margin-top:6px;}
   .memoAddRow input{flex:1; background:#1a1b1e; border:1px solid var(--line); border-radius:10px; padding:9px 11px; color:var(--text); font-size:13px;}
   .memoAddRow button{background:var(--accent); border:none; color:#1b1206; border-radius:10px; padding:0 14px; font-weight:700; font-size:13px;}
@@ -118,8 +124,8 @@
   <div class="gatecard">
     <h1>교대근무 캘린더</h1>
     <p>둘이 같은 그룹코드를 입력하면 캘린더가 공유돼요. 처음이면 원하는 코드를 새로 만들고, 상대방에게 그대로 알려주세요.</p>
-    <input id="nameInput" placeholder="내 이름 (예: 강호)">
-    <input id="codeInput" placeholder="그룹코드 (예: kangho2026)">
+    <input id="Kangho" placeholder="내 이름 (예: 강호)">
+    <input id="norang" placeholder="그룹코드 (예: kangho2026)">
     <button id="enterBtn">시작하기</button>
   </div>
 </div>
@@ -285,7 +291,7 @@ async function fetchMonthRaw(y,m){
   const end = fmt(new Date(y, m+2, 0));
   const [{data:ov}, {data:mm}, {data:ev}] = await Promise.all([
     sb.from('shift_overrides').select('*').eq('group_code', groupCode).gte('shift_date', start).lte('shift_date', end),
-    sb.from('memos').select('*').eq('group_code', groupCode).gte('memo_date', start).lte('memo_date', end).order('created_at'),
+    sb.from('memos').select('*').eq('group_code', groupCode).gte('memo_date', start).lte('memo_date', end).order('sort_order'),
     sb.from('events').select('*').eq('group_code', groupCode).lte('start_date', end).gte('end_date', start)
   ]);
   const ovX = {}; (ov||[]).forEach(r => ovX[r.person+'|'+r.shift_date] = r);
@@ -352,7 +358,7 @@ function cellInnerHTML(person, ds, d){
     : `<div class="badge" style="background:${meta.color}">${label}</div>`;
   inner += barsHTML(ds, dow);
   memosOf(person, ds).forEach(mm=>{
-    inner += `<div class="memoline">${mm.content.replace(/</g,'&lt;')}</div>`;
+    inner += `<div class="memoline${mm.done?' done':''}">${mm.content.replace(/</g,'&lt;')}</div>`;
   });
   return inner;
 }
@@ -448,7 +454,8 @@ function renderSwatches(){
 
 async function addMemo(person, text){
   if(!text.trim()) return;
-  await sb.from('memos').insert({group_code:groupCode, person, memo_date:selectedDate, content:text.trim(), author:myName});
+  const order = memosOf(person, selectedDate).length;
+  await sb.from('memos').insert({group_code:groupCode, person, memo_date:selectedDate, content:text.trim(), author:myName, sort_order:order});
   await loadMonthData();
   buildMembersSheet();
 }
@@ -463,6 +470,58 @@ async function updateMemo(id, text){
   await loadMonthData();
   buildMembersSheet();
 }
+async function toggleMemoDone(id, done){
+  await sb.from('memos').update({done}).eq('id', id);
+  await loadMonthData();
+  buildMembersSheet();
+}
+async function commitMemoOrder(orderedIds){
+  await Promise.all(orderedIds.map((id, idx) => sb.from('memos').update({sort_order: idx}).eq('id', id)));
+  await loadMonthData();
+  buildMembersSheet();
+}
+function enableMemoDrag(container){
+  let dragEl=null, startY=0;
+  function items(){ return Array.from(container.querySelectorAll('.memoItem')); }
+  function onMove(e){
+    if(!dragEl) return;
+    e.preventDefault();
+    const y = e.touches[0].clientY;
+    dragEl.style.transform = `translateY(${y-startY}px)`;
+    const dRect = dragEl.getBoundingClientRect();
+    const dCenter = dRect.top + dRect.height/2;
+    items().forEach(it=>{
+      if(it===dragEl) return;
+      const r = it.getBoundingClientRect();
+      const center = r.top + r.height/2;
+      if(dCenter < center && dragEl.nextElementSibling===it){
+        container.insertBefore(dragEl, it); startY = y; dragEl.style.transform='translateY(0px)';
+      } else if(dCenter > center && dragEl.previousElementSibling===it){
+        container.insertBefore(dragEl, it.nextElementSibling); startY = y; dragEl.style.transform='translateY(0px)';
+      }
+    });
+  }
+  function onEnd(){
+    if(!dragEl) return;
+    dragEl.classList.remove('dragging');
+    dragEl.style.transform = '';
+    document.removeEventListener('touchmove', onMove);
+    document.removeEventListener('touchend', onEnd);
+    const ids = items().map(it=>it.dataset.id);
+    dragEl = null;
+    commitMemoOrder(ids);
+  }
+  items().forEach(item=>{
+    const handle = item.querySelector('.dragHandle');
+    if(!handle) return;
+    handle.addEventListener('touchstart', (e)=>{
+      dragEl = item; startY = e.touches[0].clientY;
+      dragEl.classList.add('dragging');
+      document.addEventListener('touchmove', onMove, {passive:false});
+      document.addEventListener('touchend', onEnd);
+    }, {passive:true});
+  });
+}
 
 function buildMembersSheet(){
   const wrap = document.getElementById('membersSheet'); wrap.innerHTML = '';
@@ -474,8 +533,11 @@ function buildMembersSheet(){
 
     const memoWrap = document.createElement('div');
     memosOf(mem.name, selectedDate).forEach(mm=>{
-      const item = document.createElement('div'); item.className='memoItem';
+      const item = document.createElement('div'); item.className='memoItem'; item.dataset.id = mm.id;
+      const handle = document.createElement('span'); handle.className='dragHandle'; handle.textContent='⠿';
+      item.appendChild(handle);
       const span = document.createElement('span'); span.textContent = mm.content;
+      if(mm.done) span.classList.add('done');
       span.onclick = () => {
         const input = document.createElement('input'); input.value = mm.content;
         item.replaceChild(input, span); input.focus(); input.select();
@@ -484,11 +546,15 @@ function buildMembersSheet(){
         input.onblur = commit;
       };
       item.appendChild(span);
+      const doneBtn = document.createElement('button'); doneBtn.className = 'doneBtn' + (mm.done?' on':''); doneBtn.textContent='✓';
+      doneBtn.onclick = () => toggleMemoDone(mm.id, !mm.done);
+      item.appendChild(doneBtn);
       const delBtn = document.createElement('button'); delBtn.textContent='✕';
       delBtn.onclick = () => deleteMemo(mm.id);
       item.appendChild(delBtn);
       memoWrap.appendChild(item);
     });
+    enableMemoDrag(memoWrap);
     const addRow = document.createElement('div'); addRow.className='memoAddRow';
     const input = document.createElement('input'); input.placeholder='메모 추가...';
     const addBtn = document.createElement('button'); addBtn.textContent='추가';
