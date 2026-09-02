@@ -76,14 +76,15 @@
   .msection:last-of-type{border-bottom:none; padding-bottom:0;}
   .msection .mname{font-size:13px; font-weight:700; color:var(--sub); margin-bottom:10px;}
   .memoItem{display:flex; align-items:center; gap:6px; background:#1a1b1e; border-radius:10px; padding:8px 8px; margin-bottom:6px; font-size:12.5px;}
-  .memoItem .dragHandle{color:var(--sub); font-size:16px; font-weight:800; padding:8px 10px; margin:-8px -4px -8px -6px; cursor:grab; touch-action:none; display:flex; align-items:center; justify-content:center;}
+  .memoItem .arrowGroup{display:flex; flex-direction:column; gap:1px;}
+  .memoItem .arrowBtn{background:#232428; border:none; color:var(--text); font-size:8px; width:18px; height:14px; padding:0; border-radius:3px; line-height:1;}
+  .memoItem .arrowBtn:disabled{opacity:.25;}
   .memoItem span{flex:1; color:var(--memo); cursor:pointer;}
   .memoItem span.done{color:var(--sub); text-decoration:line-through;}
   .memoItem input{flex:1; background:#232428; border:1px solid var(--accent); border-radius:6px; color:var(--text); font-size:12.5px; padding:4px 6px;}
   .memoItem button{background:none; border:none; color:var(--sub); font-size:15px; padding:0 4px;}
   .memoItem .doneBtn{color:var(--memo); font-size:14px;}
   .memoItem .doneBtn.on{color:var(--accent);}
-  .memoItem.dragging{opacity:.5; background:#26282e;}
   .memoline.done{color:var(--sub); text-decoration:line-through;}
   .memoAddRow{display:flex; gap:6px; margin-top:6px;}
   .memoAddRow input{flex:1; background:#1a1b1e; border:1px solid var(--line); border-radius:10px; padding:9px 11px; color:var(--text); font-size:13px;}
@@ -475,53 +476,18 @@ async function toggleMemoDone(id, done){
   await loadMonthData();
   buildMembersSheet();
 }
-async function commitMemoOrder(orderedIds){
-  await Promise.all(orderedIds.map((id, idx) => sb.from('memos').update({sort_order: idx}).eq('id', id)));
+async function moveMemo(person, id, dir){
+  const list = memosOf(person, selectedDate);
+  const idx = list.findIndex(m=>m.id===id);
+  const swapIdx = idx + dir;
+  if(idx<0 || swapIdx<0 || swapIdx>=list.length) return;
+  const a = list[idx], b = list[swapIdx];
+  await Promise.all([
+    sb.from('memos').update({sort_order: swapIdx}).eq('id', a.id),
+    sb.from('memos').update({sort_order: idx}).eq('id', b.id)
+  ]);
   await loadMonthData();
   buildMembersSheet();
-}
-function enableMemoDrag(container){
-  let dragEl=null, startY=0;
-  function items(){ return Array.from(container.querySelectorAll('.memoItem')); }
-  function onMove(e){
-    if(!dragEl) return;
-    e.preventDefault();
-    const y = e.touches[0].clientY;
-    dragEl.style.transform = `translateY(${y-startY}px)`;
-    const dRect = dragEl.getBoundingClientRect();
-    const dCenter = dRect.top + dRect.height/2;
-    items().forEach(it=>{
-      if(it===dragEl) return;
-      const r = it.getBoundingClientRect();
-      const center = r.top + r.height/2;
-      if(dCenter < center && dragEl.nextElementSibling===it){
-        container.insertBefore(dragEl, it); startY = y; dragEl.style.transform='translateY(0px)';
-      } else if(dCenter > center && dragEl.previousElementSibling===it){
-        container.insertBefore(dragEl, it.nextElementSibling); startY = y; dragEl.style.transform='translateY(0px)';
-      }
-    });
-  }
-  function onEnd(){
-    if(!dragEl) return;
-    dragEl.classList.remove('dragging');
-    dragEl.style.transform = '';
-    document.removeEventListener('touchmove', onMove);
-    document.removeEventListener('touchend', onEnd);
-    const ids = items().map(it=>it.dataset.id);
-    dragEl = null;
-    commitMemoOrder(ids);
-  }
-  items().forEach(item=>{
-    const handle = item.querySelector('.dragHandle');
-    if(!handle) return;
-    handle.addEventListener('touchstart', (e)=>{
-      e.preventDefault();
-      dragEl = item; startY = e.touches[0].clientY;
-      dragEl.classList.add('dragging');
-      document.addEventListener('touchmove', onMove, {passive:false});
-      document.addEventListener('touchend', onEnd);
-    }, {passive:false});
-  });
 }
 
 function buildMembersSheet(){
@@ -533,10 +499,18 @@ function buildMembersSheet(){
     sec.innerHTML = `<div class="mname">${mem.name}</div><div class="chiprow" id="chips_${mem.name}"></div>`;
 
     const memoWrap = document.createElement('div');
-    memosOf(mem.name, selectedDate).forEach(mm=>{
+    const memoList = memosOf(mem.name, selectedDate);
+    memoList.forEach((mm, idx)=>{
       const item = document.createElement('div'); item.className='memoItem'; item.dataset.id = mm.id;
-      const handle = document.createElement('span'); handle.className='dragHandle'; handle.textContent='=';
-      item.appendChild(handle);
+      const arrows = document.createElement('span'); arrows.className='arrowGroup';
+      const upBtn = document.createElement('button'); upBtn.className='arrowBtn'; upBtn.textContent='▲';
+      upBtn.disabled = idx===0;
+      upBtn.onclick = () => moveMemo(mem.name, mm.id, -1);
+      const downBtn = document.createElement('button'); downBtn.className='arrowBtn'; downBtn.textContent='▼';
+      downBtn.disabled = idx===memoList.length-1;
+      downBtn.onclick = () => moveMemo(mem.name, mm.id, 1);
+      arrows.appendChild(upBtn); arrows.appendChild(downBtn);
+      item.appendChild(arrows);
       const span = document.createElement('span'); span.textContent = mm.content;
       if(mm.done) span.classList.add('done');
       span.onclick = () => {
@@ -555,7 +529,6 @@ function buildMembersSheet(){
       item.appendChild(delBtn);
       memoWrap.appendChild(item);
     });
-    enableMemoDrag(memoWrap);
     const addRow = document.createElement('div'); addRow.className='memoAddRow';
     const input = document.createElement('input'); input.placeholder='메모 추가...';
     const addBtn = document.createElement('button'); addBtn.textContent='추가';
