@@ -292,7 +292,7 @@ async function fetchMonthRaw(y,m){
   const end = fmt(new Date(y, m+2, 0));
   const [{data:ov}, {data:mm}, {data:ev}] = await Promise.all([
     sb.from('shift_overrides').select('*').eq('group_code', groupCode).gte('shift_date', start).lte('shift_date', end),
-    sb.from('memos').select('*').eq('group_code', groupCode).gte('memo_date', start).lte('memo_date', end).order('sort_order'),
+    sb.from('memos').select('*').eq('group_code', groupCode).gte('memo_date', start).lte('memo_date', end).order('sort_order').order('created_at'),
     sb.from('events').select('*').eq('group_code', groupCode).lte('start_date', end).gte('end_date', start)
   ]);
   const ovX = {}; (ov||[]).forEach(r => ovX[r.person+'|'+r.shift_date] = r);
@@ -482,10 +482,15 @@ async function moveMemo(person, id, dir){
   const swapIdx = idx + dir;
   if(idx<0 || swapIdx<0 || swapIdx>=list.length) return;
   const a = list[idx], b = list[swapIdx];
-  await Promise.all([
+  const [r1, r2] = await Promise.all([
     sb.from('memos').update({sort_order: swapIdx}).eq('id', a.id),
     sb.from('memos').update({sort_order: idx}).eq('id', b.id)
   ]);
+  if(r1.error || r2.error){
+    alert('순서 변경 실패: ' + (r1.error?.message || r2.error?.message));
+    return;
+  }
+  monthCache = {};
   await loadMonthData();
   buildMembersSheet();
 }
