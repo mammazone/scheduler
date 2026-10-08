@@ -110,6 +110,12 @@
   .eventItem .edot{width:10px; height:10px; border-radius:3px; flex-shrink:0;}
   .eventItem span{flex:1;}
   .eventItem button{background:none; border:none; color:var(--sub); font-size:15px;}
+  #typeList .typeItemLabel{font-size:11.5px; color:var(--sub); margin-bottom:6px;}
+  .searchResult{background:#1a1b1e; border-radius:10px; padding:10px 12px; margin-bottom:8px;}
+  .searchResult .srDate{color:var(--accent); font-weight:700; font-size:11.5px;}
+  .searchResult .srPerson{color:var(--sub); font-size:10.5px; margin-left:6px;}
+  .searchResult .srText{color:var(--text); font-size:13px; margin-top:3px;}
+  .searchEmpty{color:var(--sub); font-size:12.5px; text-align:center; padding:22px 0;}
 
   .gate{min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px;}
   .gatecard{background:#111214; border-radius:20px; padding:28px 24px; width:100%; max-width:380px;}
@@ -125,8 +131,8 @@
   <div class="gatecard">
     <h1>교대근무 캘린더</h1>
     <p>둘이 같은 그룹코드를 입력하면 캘린더가 공유돼요. 처음이면 원하는 코드를 새로 만들고, 상대방에게 그대로 알려주세요.</p>
-    <input id="Kangho" placeholder="내 이름 (예: 강호)">
-    <input id="norang" placeholder="그룹코드 (예: kangho2026)">
+    <input id="nameInput" placeholder="Kangho">
+    <input id="codeInput" placeholder="norang">
     <button id="enterBtn">시작하기</button>
   </div>
 </div>
@@ -137,6 +143,7 @@
       <div class="ym" id="ymLabel"></div>
       <div class="navbtns">
         <button class="addEventBtn" id="addEventBtn">+ 일정</button>
+        <button id="searchBtn">🔍</button>
         <button id="settingsBtn">⚙</button>
         <button id="prevM">‹</button>
         <button id="nextM">›</button>
@@ -173,6 +180,7 @@
       <div class="swrow" id="swRow"></div>
       <label class="offchk"><input type="checkbox" id="offChk"> 휴무처럼 배지 없이 글자로만 표시</label>
       <button class="save2" id="saveTypeBtn">근무형태 추가</button>
+      <div id="typeList" style="margin-top:12px;"></div>
     </div>
     <div class="row">
       <button class="cancel" id="cancelBtn">닫기</button>
@@ -189,6 +197,15 @@
     <div id="patternPicker" style="margin-bottom:18px;"></div>
     <button class="save2" id="logoutBtn" style="background:#ff5c72; color:#1b0606;">다른 이름/그룹코드로 로그아웃</button>
     <div class="row"><button class="cancel" id="settingsCancelBtn">닫기</button></div>
+  </div>
+</div>
+
+<div class="sheet-bg" id="searchSheetBg">
+  <div class="sheet">
+    <h2>메모 검색</h2>
+    <input type="text" id="searchInput" placeholder="검색할 메모 내용 입력..." style="width:100%; background:#1a1b1e; border:1px solid var(--line); border-radius:12px; padding:13px; color:var(--text); font-size:15px; margin-bottom:12px;">
+    <div id="searchResults"></div>
+    <div class="row"><button class="cancel" id="searchCancelBtn">닫기</button></div>
   </div>
 </div>
 
@@ -228,8 +245,11 @@ try{
   throw e;
 }
 
-const ANCHOR = new Date(2026, 7, 1);
-const PATTERN = ['야간','야간','휴무','휴무','주간','주간','휴무','휴무'];
+// 근무 패턴이 바뀔 때마다 아래에 구간을 추가하면 돼요. start 이후 날짜부터 해당 pattern이 8일 주기로 적용돼요.
+const PATTERN_PERIODS = [
+  { start: new Date(2026, 7, 1),  pattern: ['야간','야간','휴무','휴무','주간','주간','휴무','휴무'] },
+  { start: new Date(2026, 9, 24), pattern: ['휴무','휴무','주간','주간','휴무','휴무','야간','야간'] }
+];
 const PALETTE = ['#4d7cff','#f2c14e','#ff5c8a','#3ddc84','#b083f0','#ff9f4d','#43c9c9','#9aa0ae'];
 
 const HOLIDAYS = {
@@ -251,8 +271,11 @@ let viewMode = 'mine';
 function fmt(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 function patternOwnerName(){ const p = members.find(m=>m.has_pattern); return p ? p.name : null; }
 function computePattern(d){
-  const diff = Math.floor((new Date(d.getFullYear(),d.getMonth(),d.getDate()) - ANCHOR)/86400000);
-  return PATTERN[((diff % 8) + 8) % 8];
+  const dd = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  let period = PATTERN_PERIODS[0];
+  for(const p of PATTERN_PERIODS){ if(p.start <= dd) period = p; else break; }
+  const diff = Math.floor((dd - period.start)/86400000);
+  return period.pattern[((diff % 8) + 8) % 8];
 }
 function baseTypeFor(person, d){ return (person === patternOwnerName()) ? computePattern(d) : '휴무'; }
 function typeOf(person, dateStr, d){ const k = person+'|'+dateStr; return overrides[k] ? overrides[k].shift_type : baseTypeFor(person, d); }
@@ -441,8 +464,33 @@ function renderChipsFor(person, container){
     container.appendChild(c);
   });
   const add = document.createElement('div'); add.className = 'chip addnew'; add.textContent = '+ 근무형태 추가';
-  add.onclick = () => { addFormTargetPerson = person; document.getElementById('addForm').classList.toggle('show'); };
+  add.onclick = () => {
+    addFormTargetPerson = person;
+    document.getElementById('addForm').classList.toggle('show');
+    renderTypeList();
+  };
   container.appendChild(add);
+}
+function renderTypeList(){
+  const wrap = document.getElementById('typeList'); wrap.innerHTML = '';
+  const head = document.createElement('div'); head.className='typeItemLabel'; head.textContent='근무형태 관리 (삭제)';
+  wrap.appendChild(head);
+  shiftTypes.forEach(t=>{
+    const item = document.createElement('div'); item.className='eventItem';
+    item.innerHTML = `<span class="edot" style="background:${t.color}; border-radius:50%;"></span><span>${t.label}${t.is_off?' (텍스트형)':''}</span>`;
+    const delBtn = document.createElement('button'); delBtn.textContent='✕';
+    delBtn.onclick = async () => {
+      if(!confirm(`"${t.label}" 근무형태를 삭제할까요? 이미 등록된 날짜의 표시가 이상해질 수 있어요.`)) return;
+      await sb.from('shift_types').delete().eq('id', t.id);
+      await loadShiftTypes();
+      renderTypeList();
+      members.forEach(mem=> renderChipsFor(mem.name, document.getElementById('chips_'+mem.name)));
+      monthCache = {};
+      loadMonthData();
+    };
+    item.appendChild(delBtn);
+    wrap.appendChild(item);
+  });
 }
 function renderSwatches(){
   const row = document.getElementById('swRow'); row.innerHTML = '';
@@ -703,6 +751,48 @@ function renderPatternPicker(){
     wrap.appendChild(row);
   });
 }
+// ===== 메모 검색 =====
+function fmtKDate(ds){
+  const [y,m,d] = ds.split('-');
+  return `${y}.${m}.${d}`;
+}
+async function runMemoSearch(q){
+  const resultsEl = document.getElementById('searchResults');
+  if(!q.trim()){ resultsEl.innerHTML = ''; return; }
+  const {data, error} = await sb.from('memos').select('*').eq('group_code', groupCode).ilike('content', `%${q.trim()}%`).order('memo_date').limit(50);
+  if(error){ resultsEl.innerHTML = `<div class="searchEmpty">검색 실패: ${error.message}</div>`; return; }
+  if(!data || data.length===0){ resultsEl.innerHTML = '<div class="searchEmpty">검색 결과가 없어요</div>'; return; }
+  resultsEl.innerHTML = '';
+  data.forEach(r=>{
+    const item = document.createElement('div'); item.className = 'searchResult';
+    item.innerHTML = `<span class="srDate">${fmtKDate(r.memo_date)}</span><span class="srPerson">${r.person}</span><div class="srText"></div>`;
+    item.querySelector('.srText').textContent = r.content;
+    item.onclick = async () => {
+      document.getElementById('searchSheetBg').classList.remove('show');
+      const [y,m,d] = r.memo_date.split('-').map(Number);
+      cur = new Date(y, m-1, 1);
+      monthCache = {};
+      await loadMonthData();
+      openSheet(r.memo_date, new Date(y, m-1, d));
+    };
+    resultsEl.appendChild(item);
+  });
+}
+let searchDebounce = null;
+document.getElementById('searchBtn').onclick = () => {
+  document.getElementById('searchInput').value = '';
+  document.getElementById('searchResults').innerHTML = '';
+  document.getElementById('searchSheetBg').classList.add('show');
+  setTimeout(()=> document.getElementById('searchInput').focus(), 100);
+};
+document.getElementById('searchInput').addEventListener('input', (e)=>{
+  clearTimeout(searchDebounce);
+  const q = e.target.value;
+  searchDebounce = setTimeout(()=> runMemoSearch(q), 300);
+});
+document.getElementById('searchCancelBtn').onclick = () => document.getElementById('searchSheetBg').classList.remove('show');
+document.getElementById('searchSheetBg').addEventListener('click', (e)=>{ if(e.target.id==='searchSheetBg') document.getElementById('searchSheetBg').classList.remove('show'); });
+
 document.getElementById('settingsBtn').onclick = () => {
   document.getElementById('stMe').textContent = myName;
   document.getElementById('stGrp').textContent = groupCode;
